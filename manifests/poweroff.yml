@@ -1,0 +1,8 @@
+---
+- hosts: aball
+  tasks:
+  # power stuff off
+  - name: power off
+    command: poweroff -f
+    async: 24
+    poll: 0

@@ -1,0 +1,27 @@
+---
+- hosts: aball
+  vars:
+    admins:
+    - alimon
+    - afxez0r
+  tasks:
+  # make sure users own their homes, otherwise deletion fails
+  - name: set home permissions
+    file: path=/home/{{ item }} owner={{ item }} recurse=yes state=directory
+    with_items: "{{admins}}"
+  - name: set spool permissions
+    file: path=/var/spool/mail/{{ item }} state=absent
+    with_items: "{{admins}}"
+  # user accounts for admins
+  - name: admin account removal
+    user: name={{ item }} state=absent remove=yes
+    with_items: "{{admins}}"
+  # group accounts for admins
+  - name: admin account group removal
+    group: name={{ item }} state=absent
+    with_items: "{{admins}}"
+  # generic ab group and user
+  - name: ab user setup
+    user: name=ab uid=9001 group=ab comment="AutoBuilder user" home=/srv/ab move_home=yes state=absent remove=yes force=yes
+  - name: ab group setup
+    group: name=ab gid=9001 state=absent

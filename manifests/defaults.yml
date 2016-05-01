@@ -1,0 +1,116 @@
+---
+- hosts: aball
+  vars:
+    dnsserver: 192.168.15.1
+  tasks:
+  # add some vimrc lines
+  - name: gather vimrc location
+    shell: find /etc -name vimrc
+    register: etc_vimrc
+  - name: add lines to global vimrc
+    blockinfile:
+      dest: "{{ etc_vimrc.stdout }}"
+      follow: yes
+      marker: '" {mark} ANSIBLE MANAGED BLOCK'
+      block: |
+        syntax on
+        filetype on
+        set number
+        set numberwidth=1
+        set tabstop=4
+        set shiftwidth=4
+        set expandtab
+        set nowritebackup
+        set noswapfile
+        set nocompatible
+  # deploy proxies to profile.d
+  - name: write proxies file in profile.d
+    template:
+      src: /srv/abansible/templates/proxies.j2
+      dest: /etc/profile.d/proxies.sh
+  # deploy aliases to profile.d
+  - name: write aliases file in profile.d
+    template:
+      src: /srv/abansible/templates/aliases.j2
+      dest: /etc/profile.d/extra_aliases.sh
+
+  # attempt at DNS config on all Distros
+
+  # openSUSE
+  - name: setup dns server on openSUSE
+    lineinfile:
+      dest: /etc/sysconfig/network/config
+      regexp: ^NETCONFIG_DNS_STATIC_SERVERS=
+      line: NETCONFIG_DNS_STATIC_SERVERS="{{dnsserver}}"
+    when: ansible_distribution == 'openSUSE'
+    # update netconfig on openSUSE
+  - name: netconfigupdate
+    shell: netconfig update -f
+    when: ansible_distribution == 'openSUSE'
+    
+  # Debian and Fedora play nice with resolv.conf
+  - name: setup dns server on Debian or Fedora
+    blockinfile:
+      dest: /etc/resolv.conf
+      block: |
+        nameserver {{dnsserver}}
+    when: ansible_distribution == 'Debian' or ansible_distribution == 'Fedora'
+  
+  # Ubuntu and its NetworkManager
+  - name: setup dns server on Ubuntu
+    blockinfile:
+      dest: /etc/NetworkManager/system-connections/tap
+      block: |
+        dns={{dnsserver}};
+    when: ansible_distribution == 'Ubuntu'
+
+# Package stuff
+- hosts: workers
+  vars:
+    pkgs:
+    - vim
+    - git
+  tasks:
+  # ensure installed packages
+  - name: ensure installed packages
+    action: "{{ansible_pkg_mgr}} name={{item}} state=present"
+    with_items: "{{pkgs}}"
+
+  - name: ensure NFS on ubuntu/deb
+    apt: name=nfs-common state=latest
+    when: ansible_os_family == 'Debian'
+
+  - name: ensure NFS on fedora
+    dnf: name=nfs-utils state=latest
+    when: ansible_distribution == 'Fedora'
+
+  - name: ensure NFS on openSUSE
+    zypper: name=nfs-client state=latest
+    when: ansible_distribution == 'openSUSE'
+
+# Physical hosts defaults
+- hosts: iron
+  vars:
+    pkgs:
+    - lvm2
+    - hdparm
+    - xfsprogs
+    - bridge-utils
+    - nfs-kernel-server
+    - qemu-kvm
+    - libvirt-bin
+    - vim
+    - sudo
+    - git
+    - unzip
+  tasks:
+  # ensure installed packages
+  - name: ensure server packages are installed
+    apt: "name={{item}} state=latest"
+    with_items: "{{pkgs}}"
+  # ensure bridge is allowed for qemu
+  - name: allow bridge for qemu in servers
+    lineinfile:
+      dest: /etc/qemu/bridge.conf
+      line: allow br0
+      create: yes

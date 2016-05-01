@@ -1,0 +1,62 @@
+---
+- hosts: aball
+  vars:
+    admins:
+    - alimon
+    - afxez0r
+    abuser: ab
+    id: 9001
+  tasks:
+
+  # user accounts for admins
+  - name: gather bash location
+    shell: which bash
+    register: bash_bin
+  - name: admin account setup
+    user: name={{ item }} shell="{{bash_bin.stdout}}" state=present
+    with_items: "{{admins}}"
+    # make sure users own their homes
+  - name: set admin home permissions
+    file: path=/home/{{ item }} owner={{ item }}
+    with_items: "{{admins}}"
+
+  # generic ab group and user
+  - name: ab group setup
+    group: name="{{abuser}}" gid="{{id}}"
+  - name: ab user setup
+    user: name="{{abuser}}" uid="{{id}}" group="{{abuser}}" comment="AutoBuilder user" state=present shell="{{bash_bin.stdout}}"
+  - name: create home symlink
+    file: src="/home/{{abuser}}" dest="/srv/{{abuser}}" state=link
+
+  # sudo and wheel groups
+  - name: gather groups in system
+    shell: getent group | awk -F':' '{print $1}'
+    register: etc_groups
+  - name: add appropriate sudo group to admins
+    user: name={{ item[0] }} groups={{ item[1] }} append=yes
+    when: '"{{ item[1] }}" in etc_groups.stdout_lines'
+    with_nested:
+      - "{{admins}}"
+      - [ 'sudo', 'wheel' ]
+
+  # deploy ssh keys so root can ssh as ab
+  - name: deploy root ssh keys to ab user
+    authorized_key:
+      user: ab
+      key: "{{ lookup('file', '/root/.ssh/id_rsa.pub') }}"
+
+  # deploy admin ssh authorized keys
+  - name: deploy ssh authorized keys for admins
+    authorized_key:
+      user: "{{ item }}"
+      key: "{{ lookup('file', '/srv/authkeys/' + item + '/authorized_keys') }}"
+    with_items: "{{admins}}"
+
+  # deploy admin ssh authorized keys to ab user
+  - name: deploy admins ssh keys to ab user
+    authorized_key:
+      user: ab
+      key: "{{ lookup('file', '/srv/authkeys/' + item + '/authorized_keys') }}"
+    with_items: "{{admins}}"
+
+  # todo: add sudo for admins so they can become ab, root

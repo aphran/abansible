@@ -1,0 +1,73 @@
+---
+- hosts: yctb01
+  vars:
+    proj: "/srv/abscripts.git"
+    user: git
+    id: 5000
+  tasks:
+  # user accounts for admins
+  - name: gather bash location
+    shell: which bash
+    register: bash_bin
+  # git user
+  - name: git group setup
+    group: name="{{user}}" gid="{{id}}"
+  - name: git user setup
+    user: name="{{user}}" uid="{{id}}" group="{{user}}" comment="git user" home=/srv/git move_home=yes state=present shell="{{bash_bin.stdout}}"
+  # proj directory
+  - name: ensure proj directory
+    file: path="{{proj}}" owner="{{user}}" group="{{user}}" state=directory mode=0777
+  # setup umask
+  - name: setup export umask
+    shell: umask 0000
+    args:
+      chdir: "{{proj}}"
+
+- hosts: workers
+  vars:
+    abuser: ab
+  tasks:
+  # deploy public and private keys from server/git to worker/ab
+  - name: ensure ab private, public keys from local git user
+    copy:
+      src: "/srv/git/.ssh/{{item}}"
+      dest: "/srv/ab/.ssh/{{item}}"
+      owner: "{{abuser}}"
+      group: "{{abuser}}"
+      mode: 0600
+    with_items:
+    - id_rsa.pub
+    - id_rsa
+
+- hosts: workers
+  vars:
+    abuser: ab
+  remote_user: "{{abuser}}"
+  tasks:
+  # clone code dirs from git server
+  - name: clone git repos
+    git:
+     accept_hostkey: yes
+     repo: "git@yctb01:/srv/{{item}}.git"
+     dest: "/srv/{{abuser}}/{{item}}"
+     version: master
+     force: yes
+    with_items:
+    - abscripts
+    - autobuilder
+
+- hosts: iron
+  vars:
+    gituser: aphran
+  tasks:
+  # clone from github
+  - name: clone git repos from github
+    git:
+     accept_hostkey: yes
+     repo: "https://github.com/{{gituser}}/{{item}}.git"
+     dest: "/srv/{{item}}"
+     version: master
+     force: yes
+    with_items:
+    - vscripts
+

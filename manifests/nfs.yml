@@ -1,0 +1,154 @@
+---
+# exports from yctb01: builds, sources, sstates
+- hosts: yctb01
+  vars:
+    exports:
+    - "/srv/data/builds"
+    - "/srv/data/sources"
+    - "/srv/data/sstates"
+    id: 9001
+    mask: 000
+    network: 192.168.15.0/255.255.255.0
+    export_opts: rw
+  tasks:
+  # nfs config
+  - name: ensure allowed port mapping
+    lineinfile:
+      dest: /etc/hosts.allow
+      line: "rpcbind mountd: {{network}}"
+  # mount point directory
+  - name: ensure mountpoint directory
+    file: path="{{item}}" owner="{{id}}" group="{{id}}" state=directory mode=0777
+    with_items: "{{exports}}"
+  # setup umask
+  - name: setup export umask
+    shell: umask 0000
+    args:
+      chdir: "{{item}}"
+    with_items: "{{exports}}"
+  # add nfs export
+  - name: add lines to nfs exports
+    blockinfile: # add block instead of line in case of future exports
+      dest: "/etc/exports"
+      follow: yes
+      block: |
+        {{item}}        {{network}}({{export_opts}})
+    with_items: "{{exports}}"
+  # restart nfs
+  - name: restart nfs
+    shell: systemctl restart nfs-kernel-server
+
+# mount on vms from yctb01
+- hosts: aball
+  vars:
+    server: yctb01
+    exports:
+    - "/srv/data/builds"
+    - "/srv/data/sources"
+    - "/srv/data/sstates"
+    bytes: 16384
+    mounter: "ab"
+    id: 9001
+    mask: 000
+  tasks:
+  # mount point directory
+  - name: ensure mountpoint directory
+    file: path="{{item}}" owner="{{mounter}}" group="{{mounter}}" state=directory mode=0777
+    with_items: "{{exports}}"
+  # setup umask
+  - name: setup export umask
+    shell: umask 0000
+    args:
+      chdir: "{{item}}"
+    with_items: "{{exports}}"
+  # add nfs mount to fstab
+  - name: add lines to mounts in fstab
+    blockinfile:
+      dest: "/etc/fstab"
+      follow: yes
+      block: |
+       {{server}}:{{item}} {{item}} nfs4  rsize={{bytes}},wsize={{bytes}},timeo=10,_netdev,noatime,nofail  0 0
+    with_items: "{{exports}}"
+  # unmount it if mounted
+  - name: unmount export
+    shell: "umount -f {{item}} || :"
+    with_items: "{{exports}}"
+  # mount all
+  - name: issue a mount
+    shell: mount -a
+
+# exports from yctb02: images, packages
+- hosts: yctb02
+  vars:
+    exports:
+    - "/srv/data/packages"
+    - "/srv/data/images"
+    id: 9001
+    mask: 000
+    network: 192.168.15.0/255.255.255.0
+    export_opts: rw
+  tasks:
+  # nfs config
+  - name: ensure allowed port mapping
+    lineinfile:
+      dest: /etc/hosts.allow
+      line: "rpcbind mountd: {{network}}"
+  # mount point directory
+  - name: ensure mountpoint directory
+    file: path="{{item}}" owner="{{id}}" group="{{id}}" state=directory mode=0777
+    with_items: "{{exports}}"
+  # setup umask
+  - name: setup export umask
+    shell: umask 0000
+    args:
+      chdir: "{{item}}"
+    with_items: "{{exports}}"
+  # add nfs export
+  - name: add lines to nfs exports
+    blockinfile: # add block instead of line in case of future exports
+      dest: "/etc/exports"
+      follow: yes
+      block: |
+        {{item}}        {{network}}({{export_opts}})
+    with_items: "{{exports}}"
+  # restart nfs
+  - name: restart nfs
+    shell: systemctl restart nfs-kernel-server
+
+# mount on vms from yctb02
+- hosts: aball
+  vars:
+    server: yctb02
+    exports:
+    - "/srv/data/packages"
+    - "/srv/data/images"
+    bytes: 16384
+    mounter: "ab"
+    id: 9001
+    mask: 000
+  tasks:
+  # mount point directory
+  - name: ensure mountpoint directory
+    file: path="{{item}}" owner="{{mounter}}" group="{{mounter}}" state=directory mode=0777
+    with_items: "{{exports}}"
+  # setup umask
+  - name: setup export umask
+    shell: umask 0000
+    args:
+      chdir: "{{item}}"
+    with_items: "{{exports}}"
+  # add nfs mount to fstab
+  - name: add lines to mounts in fstab
+    blockinfile:
+      dest: "/etc/fstab"
+      follow: yes
+      block: |
+       {{server}}:{{item}} {{item}} nfs4  rsize={{bytes}},wsize={{bytes}},timeo=10,_netdev,noatime,nofail  0 0
+    with_items: "{{exports}}"
+  # unmount it if mounted
+  - name: unmount export
+    shell: "umount -f {{item}} || :"
+    with_items: "{{exports}}"
+  # mount all
+  - name: issue a mount
+    shell: mount -a
