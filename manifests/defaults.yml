@@ -1,7 +1,5 @@
 ---
-- hosts: aball
-  vars:
-    dnsserver: 192.168.15.1
+- hosts: all
   tasks:
   # add some vimrc lines
   - name: gather vimrc location
@@ -23,18 +21,53 @@
         set nowritebackup
         set noswapfile
         set nocompatible
-  # deploy proxies to profile.d
-  - name: write proxies file in profile.d
-    template:
-      src: /srv/abansible/templates/proxies.j2
-      dest: /etc/profile.d/proxies.sh
   # deploy aliases to profile.d
   - name: write aliases file in profile.d
     template:
       src: /srv/abansible/templates/aliases.j2
       dest: /etc/profile.d/extra_aliases.sh
 
-  # attempt at DNS config on all Distros
+- hosts: iron
+  tasks:
+  # deploy host proxies to profile.d
+  - name: ensure host proxies file in profile.d
+    template:
+      src: /srv/abansible/templates/host-proxies.j2
+      dest: /etc/profile.d/proxies.sh
+
+- hosts: aball
+  tasks:
+  # deploy VM proxies to profile.d
+  - name: ensure VM proxies file in profile.d
+    template:
+      src: /srv/abansible/templates/vm-proxies.j2
+      dest: /etc/profile.d/proxies.sh
+
+# server-side proxy ssh tunnels on yctb01
+- hosts: yctb01
+  tasks:
+  - name: provide tunnels for proxies
+    blockinfile:
+      dest: /etc/rc.local
+      block: |
+        # Provide tunnels for get proxies working in 192.168.15.0/24
+        ssh -L 192.168.15.1:9111:proxy-chain.intel.com:911 localhost -N -f
+        ssh -L 192.168.15.1:1080:proxy-socks.jf.intel.com:1080 localhost -N -f
+
+# /etc/hosts file on dns server yctb01
+- hosts: yctb01
+  tasks:
+  - name: ensure proper /etc/hosts file
+    template:
+      src: /srv/abansible/templates/etc-hosts.j2
+      dest: /etc/hosts
+
+# ensure yctb domain network settings on ab nodes
+- hosts:
+  - aball
+  vars:
+    dnsserver: 192.168.15.1
+  tasks:
 
   # openSUSE
   - name: setup dns server on openSUSE
@@ -97,12 +130,14 @@
     - xfsprogs
     - bridge-utils
     - nfs-kernel-server
+    - nfs-common
     - qemu-kvm
     - libvirt-bin
     - vim
     - sudo
     - git
     - unzip
+    - tmux
   tasks:
   # ensure installed packages
   - name: ensure server packages are installed

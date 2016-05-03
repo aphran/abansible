@@ -59,7 +59,15 @@
 - hosts: iron
   vars:
     gituser: aphran
+    remote_user: root
   tasks:
+
+  # deploy .gitconfig to /root/
+  - name: ensure /root/.gitconfig
+    template:
+      src: /srv/abansible/templates/host-gitconfig.j2
+      dest: /root/.gitconfig
+
   # clone from github
   - name: clone git repos from github
     git:
@@ -70,4 +78,3 @@
      force: yes
     with_items:
     - vscripts
-

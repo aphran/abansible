@@ -28,11 +28,10 @@
     with_items: "{{exports}}"
   # add nfs export
   - name: add lines to nfs exports
-    blockinfile: # add block instead of line in case of future exports
-      dest: "/etc/exports"
+    lineinfile: # block doesn't work with {{item}}s
+      dest: /etc/exports
       follow: yes
-      block: |
-        {{item}}        {{network}}({{export_opts}})
+      line: "{{item}}    {{network}}({{export_opts}})"
     with_items: "{{exports}}"
   # restart nfs
   - name: restart nfs
@@ -63,16 +62,27 @@
     with_items: "{{exports}}"
   # add nfs mount to fstab
   - name: add lines to mounts in fstab
-    blockinfile:
-      dest: "/etc/fstab"
+    lineinfile:
+      dest: /etc/fstab
       follow: yes
-      block: |
-       {{server}}:{{item}} {{item}} nfs4  rsize={{bytes}},wsize={{bytes}},timeo=10,_netdev,noatime,nofail  0 0
+      line:
+       "{{server}}:{{item}} {{item}} nfs4 rsize={{bytes}},wsize={{bytes}},timeo=10,_netdev,noatime,nofail 0 0"
     with_items: "{{exports}}"
   # unmount it if mounted
-  - name: unmount export
+  - name: unmount exports
     shell: "umount -f {{item}} || :"
     with_items: "{{exports}}"
+  # REMOVE data nfs mount from fstab
+  - name: remove mounts from fstab
+    blockinfile:
+      dest: /etc/fstab
+      follow: yes
+      state: absent
+      block: |
+       yctb01:/srv/data /srv/data nfs4  rsize=16384,wsize=16384,timeo=10,_netdev,noatime,nofail  0 0
+  # unmount data if mounted
+  - name: unmount data export
+    shell: "umount -f /srv/data || :"
   # mount all
   - name: issue a mount
     shell: mount -a
@@ -105,11 +115,10 @@
     with_items: "{{exports}}"
   # add nfs export
   - name: add lines to nfs exports
-    blockinfile: # add block instead of line in case of future exports
-      dest: "/etc/exports"
+    lineinfile:
+      dest: /etc/exports
       follow: yes
-      block: |
-        {{item}}        {{network}}({{export_opts}})
+      line: "{{item}}    {{network}}({{export_opts}})"
     with_items: "{{exports}}"
   # restart nfs
   - name: restart nfs
@@ -139,11 +148,10 @@
     with_items: "{{exports}}"
   # add nfs mount to fstab
   - name: add lines to mounts in fstab
-    blockinfile:
-      dest: "/etc/fstab"
+    lineinfile:
+      dest: /etc/fstab
       follow: yes
-      block: |
-       {{server}}:{{item}} {{item}} nfs4  rsize={{bytes}},wsize={{bytes}},timeo=10,_netdev,noatime,nofail  0 0
+      line: "{{server}}:{{item}} {{item}} nfs4 rsize={{bytes}},wsize={{bytes}},timeo=10,_netdev,noatime,nofail 0 0"
     with_items: "{{exports}}"
   # unmount it if mounted
   - name: unmount export

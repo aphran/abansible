@@ -1,0 +1,27 @@
+[user]
+    name = {{ remote_user }}@{{ ansible_hostname }}
+
+[sendemail]
+    from = {{ remote_user }}@{{ ansible_hostname }} <{{ remote_user }}@{{ ansible_nodename }}>
+    smtpserver = fm-out.intel.com
+    smtpserverport = 25
+    confirm = auto
+
+[socks]
+    proxy = proxy.fm.intel.com:1080
+[http]
+    proxy = http://proxy.fm.intel.com:911
+[https]
+    proxy = https://proxy.fm.intel.com:912
+
+[push]
+    default = simple
+
+[alias]
+    co = checkout
+    st = status
+    sh = show
+    ci = commit
+    br = branch
+    pu = push
+    ls = ls-tree -r HEAD
